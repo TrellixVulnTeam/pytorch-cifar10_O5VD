@@ -1,4 +1,5 @@
 import argparse
+import numpy
 import os
 import torch
 import torchvision
@@ -13,13 +14,14 @@ class Cifar10:
     epoch = 0
     best_acc = 0
     acc = 0
+    loss = 0
 
     # noinspection PyInitNewSignature
     def __init__(self, args):
         self.lr = args.learning_rate
         self.test_only = args.test_only
         self.max_epoch = args.epoch
-        self.saveFile = '%s.pth' % args.model
+        self.saveFile = args.model
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print('Going to run on %s' % self.device)
@@ -28,11 +30,15 @@ class Cifar10:
 
         self.model = self.build_model(args.model)
 
+        if not args.resume:
+            self.model.load_from(numpy.load('./state_dicts/%s.npz' % self.saveFile))
+
         if self.device == 'cuda':
             self.model = torch.nn.DataParallel(self.model)
             torch.backends.cudnn.benchmark = True
 
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, momentum=0.9)
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=2, verbose=True)
 
         if args.resume:
             self.load()
@@ -51,6 +57,8 @@ class Cifar10:
                 self.epoch = epoch
                 self.train()
                 self.test()
+                self.scheduler.step(self.loss)
+                self.lr = self.optimizer.param_groups[0]['lr']
 
                 if self.acc > self.best_acc:
                     self.save()
@@ -60,7 +68,6 @@ class Cifar10:
         train_loss = 0
         correct = 0
         total = 0
-        lr = self.adjust_learning_rate()
         for batch_idx, (inputs, targets) in enumerate(self.trainloader):
             inputs, targets = inputs.to(self.device), targets.to(self.device)
             self.optimizer.zero_grad()
@@ -74,8 +81,8 @@ class Cifar10:
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
 
-            progress_bar(batch_idx, len(self.trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d) | Lr: %.5f'
-                         % (train_loss / (batch_idx + 1), 100. * correct / total, correct, total, lr))
+            progress_bar(batch_idx, len(self.trainloader), 'Lr: %.5f | Loss: %.3f | Acc: %.3f%% (%d/%d)'
+                         % (self.lr, train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
 
     def test(self):
         self.model.eval()
@@ -93,17 +100,11 @@ class Cifar10:
                 total += targets.size(0)
                 correct += predicted.eq(targets).sum().item()
 
-                progress_bar(batch_idx, len(self.testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                             % (test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+                progress_bar(batch_idx, len(self.testloader), 'Lr: %.5f | Loss: %.3f | Acc: %.3f%% (%d/%d)'
+                             % (self.lr, test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
 
         self.acc = 100. * correct / total
-
-    def adjust_learning_rate(self):
-        """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-        lr = self.lr * (0.1 ** (self.epoch // 15))
-        for param_group in self.optimizer.param_groups:
-            param_group['lr'] = lr
-        return lr
+        self.loss = test_loss
 
     def dataloader(self):
         temp_transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
@@ -138,16 +139,12 @@ class Cifar10:
     def load(self):
         print('==> Loading from save...')
         assert os.path.isdir('./state_dicts'), 'Error: no state_dicts directory found!'
-        state_dict = torch.load('./state_dicts/%s' % self.saveFile, map_location='cpu')
-        if 'model' in state_dict:
-            self.model.load_state_dict(state_dict['model'])
-            self.epoch = state_dict['epoch']
-            self.best_acc = state_dict['acc']
-        else:
-            if 'module' in state_dict:
-                self.model.load_state_dict(state_dict)
-            else:
-                self.model.module.load_state_dict(state_dict)
+        state_dict = torch.load('./state_dicts/%s.pth' % self.saveFile, map_location='cpu')
+        self.model.load_state_dict(state_dict['model'])
+        self.optimizer.load_state_dict(state_dict['optimizer'])
+        self.epoch = state_dict['epoch']
+        self.best_acc = state_dict['acc']
+        self.lr = self.optimizer.param_groups[0]['lr']
         if not self.test_only:
             print('%s epoch(s) will run, save already has %s epoch(s) and best %s accuracy'
                   % ((self.max_epoch - self.epoch), self.epoch, self.best_acc))
@@ -156,13 +153,13 @@ class Cifar10:
         print('Saving..')
         state = {
             'model': self.model.state_dict(),
-            'optim': self.optimizer.state_dict(),
+            'optimizer': self.optimizer.state_dict(),
             'acc': self.acc,
-            'epoch': self.epoch,
+            'epoch': self.epoch
         }
         if not os.path.isdir('state_dicts'):
             os.mkdir('state_dicts')
-        torch.save(state, './state_dicts/%s' % self.saveFile)
+        torch.save(state, './state_dicts/%s.pth' % self.saveFile)
         self.best_acc = self.acc
 
 
