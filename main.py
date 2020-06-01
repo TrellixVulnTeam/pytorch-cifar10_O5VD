@@ -20,23 +20,25 @@ class Cifar10:
         self.saveFile = '%s.pth' % args.model
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        print("Going to train on %s" % self.device)
+        print("Going to run on %s" % self.device)
 
         self.trainloader = self.train_dataloader()
         self.testloader = self.test_dataloader()
 
         self.model = self.build_model(args.model)
-        self.net = self.model.to(self.device)
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=args.learning_rate, momentum=0.9)
 
         if self.device == 'cuda':
-            self.net = torch.nn.DataParallel(self.net)
+            self.model = torch.nn.DataParallel(self.model)
             torch.backends.cudnn.benchmark = True
 
         if args.resume:
             self.load()
 
         self.criterion = torch.nn.CrossEntropyLoss()
-        self.optimizer = torch.optim.SGD(self.net.parameters(), lr=args.learning_rate, momentum=0.9, weight_decay=5e-4)
+        self.criterion = self.criterion.to(self.device)
+
+        self.model = self.model.to(self.device)
 
     def run(self):
         if self.test_only:
@@ -52,14 +54,14 @@ class Cifar10:
                     self.save()
 
     def train(self):
-        self.net.train()
+        self.model.train()
         train_loss = 0
         correct = 0
         total = 0
         for batch_idx, (inputs, targets) in enumerate(self.trainloader):
             inputs, targets = inputs.to(self.device), targets.to(self.device)
             self.optimizer.zero_grad()
-            outputs = self.net(inputs)
+            outputs = self.model(inputs)
             loss = self.criterion(outputs, targets)
             loss.backward()
             self.optimizer.step()
@@ -73,14 +75,14 @@ class Cifar10:
                          % (train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
 
     def test(self):
-        self.net.eval()
+        self.model.eval()
         test_loss = 0
         correct = 0
         total = 0
         with torch.no_grad():
             for batch_idx, (inputs, targets) in enumerate(self.testloader):
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
-                outputs = self.net(inputs)
+                outputs = self.model(inputs)
                 loss = self.criterion(outputs, targets)
 
                 test_loss += loss.item()
@@ -119,22 +121,22 @@ class Cifar10:
         print('==> Loading from save...')
         assert os.path.isdir('./state_dicts'), 'Error: no state_dicts directory found!'
         state_dict = torch.load('./state_dicts/%s' % self.saveFile, map_location="cpu")
-        if 'net' in state_dict:
-            self.net.load_state_dict(state_dict['net'])
+        if 'model' in state_dict:
+            self.model.load_state_dict(state_dict['model'])
             self.epoch = state_dict['epoch']
             self.best_acc = state_dict['acc']
         else:
             if 'module' in state_dict:
-                self.net.load_state_dict(state_dict)
+                self.model.load_state_dict(state_dict)
             else:
-                self.net.module.load_state_dict(state_dict)
+                self.model.module.load_state_dict(state_dict)
         if not self.test_only:
             print('%s epoch(s) will run, save already has %s epoch(s) and best %s accuracy' % ((self.max_epoch - self.epoch), self.epoch, self.best_acc))
 
     def save(self):
         print('Saving..')
         state = {
-            'net': self.net.state_dict(),
+            'model': self.model.state_dict(),
             'acc': self.acc,
             'epoch': self.epoch,
         }
