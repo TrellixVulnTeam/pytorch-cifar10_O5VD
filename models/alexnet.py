@@ -32,6 +32,9 @@ class AlexNet(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
         self.classifier = nn.Sequential(
             nn.Dropout(0.6),
+            nn.Linear(9216, 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.6),
             nn.Linear(4096, 2048),
             nn.ReLU(inplace=True),
             nn.Dropout(0.6),
