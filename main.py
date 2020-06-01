@@ -9,13 +9,7 @@ from utils import progress_bar
 
 class Cifar10:
     classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-    models = (
-        'alexnet',
-        'densenet121', 'densenet161', 'densenet169', 'densenet201',
-        'googlenet',
-        'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
-        'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn', 'vgg19_bn', 'vgg19'
-    )
+    models = ('alexnet', 'bit', 'densenet', 'googlenet', 'resnet', 'vgg')
     epoch = 0
     best_acc = 0
     acc = 0
@@ -26,6 +20,7 @@ class Cifar10:
         self.saveFile = '%s.pth' % args.model
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        print("Going to train on %s" % self.device)
 
         self.trainloader = self.train_dataloader()
         self.testloader = self.test_dataloader()
@@ -122,7 +117,7 @@ class Cifar10:
     def load(self):
         print('==> Loading from save...')
         assert os.path.isdir('./state_dicts'), 'Error: no state_dicts directory found!'
-        state_dict = torch.load('./state_dicts/%s' % self.saveFile)
+        state_dict = torch.load('./state_dicts/%s' % self.saveFile, map_location="cpu")
         if 'net' in state_dict:
             self.net.load_state_dict(state_dict['net'])
             self.epoch = state_dict['epoch']
@@ -154,6 +149,6 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--test_only', action='store_true', help='Test only')
     parser.add_argument('-l', '--learning_rate', default=0.1, type=float, help='learning rate')
     parser.add_argument('-e', '--epoch', default=200, type=float, help='Epoch count to run in total')
-    parser.add_argument('-m', '--model', required=True, help='Model to run ')  # TODO
+    parser.add_argument('-m', '--model', required=True, choices=list(Cifar10.models), help='Model to run')
     args = parser.parse_args()
     Cifar10(args).run()

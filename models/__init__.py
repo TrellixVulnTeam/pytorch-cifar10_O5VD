@@ -1,6 +1,6 @@
-from .alexnet import *
-from .densenet import *
-from .googlenet import *
-from .resnet import *
-# from .senet import *
-from .vgg import *
+from .alexnet import alexnet as alexnet
+from .bit import bitmr152x4 as bit
+from .densenet import densenet201 as densenet
+from .googlenet import googlenet as googlenet
+from .resnet import resnet152 as resnet
+from .vgg import vgg19_bn as vgg
