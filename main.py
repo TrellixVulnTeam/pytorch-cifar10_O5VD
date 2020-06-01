@@ -44,6 +44,7 @@ class Cifar10:
         else:
             for epoch in range(self.epoch, self.max_epoch):
                 print('\nEpoch: %d' % epoch)
+                self.epoch = epoch
                 self.train()
                 self.test()
 
@@ -128,7 +129,7 @@ class Cifar10:
             else:
                 self.net.module.load_state_dict(state_dict)
         if not self.test_only:
-            print('%s epoch(s) will run, save already has %s epoch(s)' % ((self.max_epoch - self.epoch), self.epoch))
+            print('%s epoch(s) will run, save already has %s epoch(s) and best %s accuracy' % ((self.max_epoch - self.epoch), self.epoch, self.best_acc))
 
     def save(self):
         print('Saving..')
