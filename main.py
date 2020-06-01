@@ -1,15 +1,21 @@
+import argparse
+import os
 import torch
 import torchvision
 
-import os
-import argparse
-
-from models import *
+import models
 from utils import progress_bar
 
 
 class Cifar10:
     classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    models = (
+        'alexnet',
+        'densenet121', 'densenet161', 'densenet169', 'densenet201',
+        'googlenet',
+        'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
+        'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn', 'vgg19_bn', 'vgg19'
+    )
     epoch = 0
     best_acc = 0
     acc = 0
@@ -17,6 +23,7 @@ class Cifar10:
     def __init__(self, args):
         self.test_only = args.test_only
         self.max_epoch = args.epoch
+        self.saveFile = '%s.pth' % args.model
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -110,41 +117,12 @@ class Cifar10:
 
     def build_model(self, model):
         print('==> Building model..')
-
-        if model == 'vgg11':
-            return vgg11()
-
-        if model == 'vgg13':
-            return vgg13()
-
-        if model == 'vgg16':
-            return vgg16()
-
-        if model == 'vgg19':
-            return vgg19()
-
-        if model == 'googlenet':
-            return googlenet()
-
-        if model == 'resnet18':
-            return resnet18()
-
-        if model == 'resnet34':
-            return resnet34()
-
-        if model == 'resnet50':
-            return resnet50()
-
-        if model == 'resnet101':
-            return resnet101()
-
-        if model == 'resnet152':
-            return resnet152()
+        return getattr(models, model)()
 
     def load(self):
         print('==> Loading from save...')
         assert os.path.isdir('./state_dicts'), 'Error: no state_dicts directory found!'
-        state_dict = torch.load('./state_dicts/%s.pt' % self.model.saveFile)
+        state_dict = torch.load('./state_dicts/%s' % self.saveFile)
         if 'net' in state_dict:
             if 'module' in state_dict['net']:
                 self.net.load_state_dict(state_dict['net'])
@@ -169,7 +147,7 @@ class Cifar10:
         }
         if not os.path.isdir('state_dicts'):
             os.mkdir('state_dicts')
-        torch.save(state, './state_dicts/%s.pt' % self.model.saveFile)
+        torch.save(state, './state_dicts/%s' % self.saveFile)
         self.best_acc = self.acc
 
 
@@ -179,16 +157,6 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--test_only', action='store_true', help='Test only')
     parser.add_argument('-l', '--learning_rate', default=0.1, type=float, help='learning rate')
     parser.add_argument('-e', '--epoch', default=200, type=float, help='Epoch count to run in total')
-    parser.add_argument('-m', '--model', required=True, help='Model to run '
-                                                             '\'vgg11\' '
-                                                             '\'vgg13\' '
-                                                             '\'vgg16\' '
-                                                             '\'vgg19\' '
-                                                             '\'googlenet\' '
-                                                             '\'resnet18\' '
-                                                             '\'resnet34\' '
-                                                             '\'resnet50\' '
-                                                             '\'resnet101\' '
-                                                             '\'resnet152\'')
+    parser.add_argument('-m', '--model', required=True, help='Model to run ')  # TODO
     args = parser.parse_args()
     Cifar10(args).run()
