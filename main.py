@@ -124,10 +124,7 @@ class Cifar10:
         assert os.path.isdir('./state_dicts'), 'Error: no state_dicts directory found!'
         state_dict = torch.load('./state_dicts/%s' % self.saveFile)
         if 'net' in state_dict:
-            if 'module' in state_dict['net']:
-                self.net.load_state_dict(state_dict['net'])
-            else:
-                self.net.module.load_state_dict(state_dict['net'])
+            self.net.load_state_dict(state_dict['net'])
             self.epoch = state_dict['epoch']
             self.best_acc = state_dict['acc']
         else:
