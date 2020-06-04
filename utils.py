@@ -1,4 +1,6 @@
+import collections
 import os
+import os.path as path
 import sys
 import time
 
@@ -6,15 +8,9 @@ _, term_width = os.popen('stty size', 'r').read().split()
 term_width = int(term_width)
 
 TOTAL_BAR_LENGTH = 65.
-last_time = time.time()
-begin_time = last_time
 
 
-def progress_bar(current, total, msg=None):
-    global last_time, begin_time
-    if current == 0:
-        begin_time = time.time()  # Reset for new bar.
-
+def progress_bar(chrono, current, total, msg=None):
     cur_len = int(TOTAL_BAR_LENGTH * current / total)
     rest_len = int(TOTAL_BAR_LENGTH - cur_len) - 1
 
@@ -26,31 +22,24 @@ def progress_bar(current, total, msg=None):
         sys.stdout.write('.')
     sys.stdout.write(']')
 
-    cur_time = time.time()
-    step_time = cur_time - last_time
-    last_time = cur_time
-    tot_time = cur_time - begin_time
+    msg_format = '  Step: %s | Tot: %s' \
+                 % (format_time(chrono.last('step_time')),
+                    format_time(chrono.total('step_time')))
 
-    L = []
-    L.append('  Step: %s' % format_time(step_time))
-    L.append(' | Tot: %s' % format_time(tot_time))
     if msg:
-        L.append(' | ' + msg)
+        msg_format += ' | %s' % msg
 
-    msg = ''.join(L)
-    sys.stdout.write(msg)
-    for i in range(term_width - int(TOTAL_BAR_LENGTH) - len(msg) - 3):
+    sys.stdout.write(msg_format)
+    for i in range(term_width - int(TOTAL_BAR_LENGTH) - len(msg_format) - 3):
         sys.stdout.write(' ')
 
-    # Go back to the center of the bar.
     for i in range(term_width - int(TOTAL_BAR_LENGTH / 2) + 2):
         sys.stdout.write('\b')
     sys.stdout.write(' %d/%d ' % (current + 1, total))
 
-    if current < total - 1:
-        sys.stdout.write('\r')
-    else:
+    if current == total - 1:
         sys.stdout.write('\n')
+    sys.stdout.write('\r')
     sys.stdout.flush()
 
 
@@ -85,3 +74,61 @@ def format_time(seconds):
     if f == '':
         f = '0ms'
     return f
+
+
+class Chrono:
+    def __init__(self):
+        self.timings = collections.OrderedDict()
+
+    def measure(self, what):
+        return Timer(lambda t: self._done(what, t))
+
+    def _done(self, what, t):
+        self.timings.setdefault(what, []).append(t)
+
+    def remove(self, what):
+        self.timings[what] = []
+
+    def last(self, what):
+        return self.timings[what][-1]
+
+    def total(self, what):
+        return sum(self.timings[what])
+
+    def avgtime(self, what, dropfirst=False):
+        timings = self.timings[what]
+        if dropfirst and len(timings) > 1:
+            timings = timings[1:]
+        return sum(timings) / len(timings)
+
+
+class Timer:
+    def __init__(self, donecb):
+        self.cb = donecb
+
+    def __enter__(self):
+        self.t0 = time.time()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        t = time.time() - self.t0
+        self.cb(t)
+
+
+class Logger:
+    def __init__(self, file):
+        if path.exists(file):
+            self.file = open(file, 'a')
+        else:
+            self.file = open(file, 'w')
+            self.header()
+
+    def header(self):
+        self.file.write('epoch, time, learning_rate, tr_loss, tr_acc, val_loss, val_acc\n')
+        self.flush()
+
+    def write(self, log):
+        self.file.write(log)
+        self.flush()
+
+    def flush(self):
+        self.file.flush()
