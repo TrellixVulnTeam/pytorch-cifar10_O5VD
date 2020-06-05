@@ -134,21 +134,18 @@ class Cifar10:
         self.last_test_loss = self.test_loss
 
     def dataloader(self):
-        temp_transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
-
-        temp_set = torchvision.datasets.CIFAR10(root='./data/', train=True, transform=temp_transform)
-        mean = temp_set.data.mean(axis=(0, 1, 2)) / 255
-        std = temp_set.data.std(axis=(0, 1, 2)) / 255
-
+        precrop, crop = (160, 128)
         transform_train = torchvision.transforms.Compose([
-            torchvision.transforms.RandomCrop(32, padding=4),
+            torchvision.transforms.Resize((precrop, precrop)),
+            torchvision.transforms.RandomCrop((crop, crop)),
             torchvision.transforms.RandomHorizontalFlip(),
             torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize(mean, std)
+            torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ])
         transform_test = torchvision.transforms.Compose([
+            torchvision.transforms.Resize((crop, crop)),
             torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize(mean, std)
+            torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ])
 
         train_dataset = torchvision.datasets.CIFAR10(root='./data', train=True, transform=transform_train)
