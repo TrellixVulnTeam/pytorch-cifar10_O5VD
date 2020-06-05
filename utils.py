@@ -49,6 +49,7 @@ class ProgressBar:
         self.term_width = int(term_width)
 
     def update(self, current, total, msg=''):
+        current = current + 1
         cur_len = int(self.TOTAL_BAR_LENGTH * current / total)
         rest_len = int(self.TOTAL_BAR_LENGTH - cur_len) - 1
 
@@ -73,6 +74,9 @@ class ProgressBar:
             sys.stdout.write('\n')
         sys.stdout.write('\r')
         sys.stdout.flush()
+
+    def newbar(self, total, msg=''):
+        self.update(-1, total, msg)
 
 
 class Chrono:
