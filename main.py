@@ -39,7 +39,7 @@ class Cifar10:
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print('Going to run on %s' % self.device)
 
-        self.trainloader, self.testloader = self.dataloader()
+        self.trainset, self.testset, self.trainloader, self.testloader = self.dataloader()
 
         print('==> Building model..')
         self.model = getattr(models, args.model)()
@@ -49,8 +49,6 @@ class Cifar10:
             torch.backends.cudnn.benchmark = True
 
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, momentum=0.9)
-        self.scheduler = torch.optim.lr_scheduler.MultiplicativeLR(self.optimizer, lr_lambda=self.lr_schedule,
-                                                                   last_epoch=-1)
 
         if args.resume:
             self.load()
@@ -60,8 +58,29 @@ class Cifar10:
 
         self.model = self.model.to(self.device)
 
-    def lr_schedule(self, epoch):
-        return 0.1 if epoch % 30 == 0 else 1
+    def get_schedule(self, dataset_size):
+        if dataset_size < 20_000:
+            return [100, 200, 300, 400, 500]
+        elif dataset_size < 500_000:
+            return [500, 3000, 6000, 9000, 10_000]
+        else:
+            return [500, 6000, 12_000, 18_000, 20_000]
+
+    def lr_schedule(self, step):
+        """Returns learning-rate for `step` or None at the end."""
+        supports = self.get_schedule(len(self.trainset))
+        # Linear warmup
+        if step < supports[0]:
+            return self.initial_lr * step / supports[0]
+        # End of training
+        elif step >= supports[-1]:
+            return None
+        # Staircase decays by factor of 10
+        else:
+            for s in supports[1:]:
+                if s < step:
+                    self.initial_lr /= 10
+            return self.initial_lr
 
     def run(self):
         if self.test_only:
@@ -74,7 +93,6 @@ class Cifar10:
                 with self.chrono.measure("epoch"):
                     self.train()
                     self.test()
-                    self.scheduler.step()
 
                 self.epoch = epoch
                 self.log()
@@ -91,6 +109,13 @@ class Cifar10:
             with self.chrono.measure("step_time"):
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
+
+                self.lr = self.lr_schedule(self.epoch * 396 + batch_idx)
+                if self.lr is None:
+                    break
+                for param_group in self.optimizer.param_groups:
+                    param_group["lr"] = self.lr
+
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs, targets)
@@ -154,7 +179,7 @@ class Cifar10:
         train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=128, num_workers=12, shuffle=True)
         test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=100, num_workers=12, shuffle=False)
 
-        return train_dataloader, test_dataloader
+        return train_dataset, test_dataset, train_dataloader, test_dataloader
 
     def load(self):
         print('==> Loading from save...')
