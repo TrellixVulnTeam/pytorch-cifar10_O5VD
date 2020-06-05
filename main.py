@@ -11,6 +11,7 @@ log_msg = '{}, {:.2f}, {:.10f}, {:.6f}, {:.4f}, {:.6f}, {:.4f}\n'
 
 class Cifar10:
     classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    models = ('bit', 'resnet')
     epoch = 0
 
     train_acc = 0
@@ -26,14 +27,14 @@ class Cifar10:
         self.lr = args.learning_rate
         self.test_only = args.test_only
         self.max_epoch = args.epoch
-        self.saveFile = 'resnet_%s' % args.experiment
+        self.saveFile = '%s_%s' % (args.model, args.experiment)
 
         self.chrono = Chrono()
 
         if not os.path.isdir(args.log_path):
             os.makedirs(args.log_path)
 
-        self.logger = Logger('%s/%s-%s.csv' % (args.log_path, 'resnet', args.experiment))
+        self.logger = Logger('%s/%s-%s.csv' % (args.log_path, args.model, args.experiment))
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print('Going to run on %s' % self.device)
@@ -41,7 +42,7 @@ class Cifar10:
         self.trainloader, self.testloader = self.dataloader()
 
         print('==> Building model..')
-        self.model = models.resnet()
+        self.model = getattr(models, args.model)()
 
         if self.device == 'cuda':
             self.model = torch.nn.DataParallel(self.model)
@@ -200,4 +201,5 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--epoch', default=200, help='Epoch count to run in total')
     parser.add_argument('-x', '--experiment', default=1, help='Experiment number')
     parser.add_argument('-lp', '--log_path', default='logs', help='Path that log files stored')
+    parser.add_argument('-m', '--model', required=True, choices=list(Cifar10.models), help='Model to run')
 Cifar10(parser.parse_args()).run()
