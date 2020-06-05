@@ -2,6 +2,7 @@ import argparse
 import os
 import torch
 import torchvision
+import numpy
 
 import models
 from utils import progress_bar, Chrono, Logger
@@ -43,6 +44,9 @@ class Cifar10:
 
         print('==> Building model..')
         self.model = getattr(models, args.model)()
+
+        if args.model == 'bit':
+            self.model.load_from(numpy.load('./state_dicts/%s.npz' % self.saveFile))
 
         if self.device == 'cuda':
             self.model = torch.nn.DataParallel(self.model)
@@ -87,14 +91,13 @@ class Cifar10:
             self.test()
         else:
             for epoch in range(self.epoch, self.max_epoch):
-                print('\nEpoch: %d' % (epoch + 1))
-                self.lr = self.optimizer.param_groups[0]['lr']
+                self.epoch = epoch
+                print('\nEpoch: %d' % (self.epoch + 1))
 
                 with self.chrono.measure("epoch"):
                     self.train()
                     self.test()
 
-                self.epoch = epoch
                 self.log()
 
                 if self.test_acc > self.best_acc:
@@ -110,7 +113,7 @@ class Cifar10:
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
 
-                self.lr = self.lr_schedule(self.epoch * 396 + batch_idx)
+                self.lr = self.lr_schedule(self.epoch * 391 + batch_idx)
                 if self.lr is None:
                     break
                 for param_group in self.optimizer.param_groups:
@@ -189,7 +192,6 @@ class Cifar10:
         self.optimizer.load_state_dict(state_dict['optimizer'])
         self.epoch = state_dict['epoch']
         self.best_acc = state_dict['acc']
-        self.lr = self.optimizer.param_groups[0]['lr']
         if not self.test_only:
             print('%s epoch(s) will run, save already has %s epoch(s) and best %s accuracy'
                   % ((self.max_epoch - self.epoch), self.epoch, self.best_acc))
