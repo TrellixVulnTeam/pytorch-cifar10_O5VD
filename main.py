@@ -1,11 +1,11 @@
 import argparse
+import numpy
 import os
 import torch
 import torchvision
-import numpy
 
 import models
-from utils import progress_bar, Chrono, Logger
+from utils import ProgressBar, Chrono, Logger, Utils
 
 log_msg = '{}, {:.2f}, {:.10f}, {:.6f}, {:.4f}, {:.6f}, {:.4f}\n'
 
@@ -71,15 +71,11 @@ class Cifar10:
             return [500, 6000, 12_000, 18_000, 20_000]
 
     def lr_schedule(self, step):
-        """Returns learning-rate for `step` or None at the end."""
         supports = self.get_schedule(len(self.trainset))
-        # Linear warmup
         if step < supports[0]:
             return self.initial_lr * step / supports[0]
-        # End of training
         elif step >= supports[-1]:
             return None
-        # Staircase decays by factor of 10
         else:
             for s in supports[1:]:
                 if s < step:
@@ -130,8 +126,15 @@ class Cifar10:
                 total += targets.size(0)
                 correct += predicted.eq(targets).sum().item()
 
-            progress_bar(self.chrono, batch_idx, len(self.trainloader), 'Lr: %.5f | Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                         % (self.lr, self.train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+            msg = 'Step: %s | Tot: %s | Lr: %.5f | Loss: %.3f | Acc: %.3f%% (%d/%d)' % \
+                  (Utils.format_time(self.chrono.last('step_time')),
+                   Utils.format_time(self.chrono.total('step_time')),
+                   self.lr,
+                   self.train_loss / (batch_idx + 1),
+                   100. * correct / total,
+                   correct,
+                   total)
+            ProgressBar.update(batch_idx, len(self.trainloader), msg)
 
         self.chrono.remove("step_time")
         self.train_acc = 100. * correct / total
@@ -154,8 +157,15 @@ class Cifar10:
                     total += targets.size(0)
                     correct += predicted.eq(targets).sum().item()
 
-                progress_bar(self.chrono, batch_idx, len(self.testloader), 'Lr: %.5f | Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                             % (self.lr, self.test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+                msg = 'Step: %s | Tot: %s | Lr: %.5f | Loss: %.3f | Acc: %.3f%% (%d/%d)' % \
+                      (Utils.format_time(self.chrono.last('step_time')),
+                       Utils.format_time(self.chrono.total('step_time')),
+                       self.lr,
+                       self.test_loss / (batch_idx + 1),
+                       100. * correct / total,
+                       correct,
+                       total)
+                ProgressBar.update(batch_idx, len(self.testloader), msg)
 
         self.chrono.remove("step_time")
         self.test_acc = 100. * correct / total
