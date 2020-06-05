@@ -22,6 +22,7 @@ class Cifar10:
     last_test_loss = 0
 
     def __init__(self, args):
+        self.initial_lr = args.learning_rate
         self.lr = args.learning_rate
         self.test_only = args.test_only
         self.max_epoch = args.epoch
@@ -47,7 +48,8 @@ class Cifar10:
             torch.backends.cudnn.benchmark = True
 
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, momentum=0.9)
-        self.scheduler = torch.optim.lr_scheduler.MultiplicativeLR(self.optimizer, lr_lambda=[self.lr_schedule])
+        self.scheduler = torch.optim.lr_scheduler.MultiplicativeLR(self.optimizer, lr_lambda=self.lr_schedule,
+                                                                   last_epoch=-1)
 
         if args.resume:
             self.load()
@@ -58,23 +60,7 @@ class Cifar10:
         self.model = self.model.to(self.device)
 
     def lr_schedule(self, epoch):
-        ratio = 1
-        if (self.last_test_loss - self.test_loss) < 0.1:
-            ratio = 0.5
-
-        if epoch > 180:
-            lr_ratio = 0.5e-3
-        elif epoch > 160:
-            lr_ratio = 1e-3
-        elif epoch > 120:
-            lr_ratio = 1e-2
-        elif epoch > 80:
-            lr_ratio = 1e-1
-        else:
-            lr_ratio = 1
-        if not (ratio * lr_ratio) == 1:
-            print("Learning rate: %s", self.lr * ratio * lr_ratio)
-        return ratio * lr_ratio
+        return 0.1 if epoch % 30 == 0 else 1
 
     def run(self):
         if self.test_only:
@@ -82,13 +68,15 @@ class Cifar10:
         else:
             for epoch in range(self.epoch, self.max_epoch):
                 print('\nEpoch: %d' % (epoch + 1))
+                self.lr = self.optimizer.param_groups[0]['lr']
+
                 with self.chrono.measure("epoch"):
                     self.train()
                     self.test()
+                    self.scheduler.step()
 
                 self.epoch = epoch
                 self.log()
-                self.lr = self.optimizer.param_groups[0]['lr']
 
                 if self.test_acc > self.best_acc:
                     self.save()
@@ -209,7 +197,7 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--resume', action='store_true', help='resume from save')
     parser.add_argument('-t', '--test_only', action='store_true', help='Test only')
     parser.add_argument('-l', '--learning_rate', default=1e-3, type=float, help='learning rate')
-    parser.add_argument('-e', '--epoch', default=200, type=float, help='Epoch count to run in total')
-    parser.add_argument('-x', '--experiment', default=1, type=float, help='random')
+    parser.add_argument('-e', '--epoch', default=200, help='Epoch count to run in total')
+    parser.add_argument('-x', '--experiment', default=1, help='Experiment number')
     parser.add_argument('-lp', '--log_path', default='logs', help='Path that log files stored')
 Cifar10(parser.parse_args()).run()

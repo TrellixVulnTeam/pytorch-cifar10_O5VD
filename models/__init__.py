@@ -1,1 +1,1 @@
-from .resnet import resnet152 as resnet
+from .resnet import resnet50 as resnet
