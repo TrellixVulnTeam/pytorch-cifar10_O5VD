@@ -1,16 +1,17 @@
 import argparse
-import numpy
 import os
+
+import numpy
 import torch
-import torchvision
 
 import models
-from utils import ProgressBar, Chrono, Logger, Utils
+from utils import ProgressBar, Chrono, Logger, Utils, dataloader, update_lr
 
 log_msg = '{}, {:.2f}, {:.10f}, {:.6f}, {:.4f}, {:.6f}, {:.4f}\n'
 
 
 class Cifar10:
+    epochs = [1, 5, 10, 20, 30, 40]
     classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     models = ('bit', 'resnet')
     epoch = 0
@@ -30,6 +31,7 @@ class Cifar10:
         self.max_epoch = args.epoch
         self.saveFile = '%s_%s' % (args.model, args.experiment)
 
+        self.progress_bar = ProgressBar()
         self.chrono = Chrono()
 
         if not os.path.isdir(args.log_path):
@@ -40,7 +42,7 @@ class Cifar10:
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print('Going to run on %s' % self.device)
 
-        self.trainset, self.testset, self.trainloader, self.testloader = self.dataloader()
+        self.trainset, self.testset, self.trainloader, self.testloader = dataloader()
 
         print('==> Building model..')
         self.model = getattr(models, args.model)()
@@ -61,26 +63,6 @@ class Cifar10:
         self.criterion = self.criterion.to(self.device)
 
         self.model = self.model.to(self.device)
-
-    def get_schedule(self, dataset_size):
-        if dataset_size < 20_000:
-            return [100, 200, 300, 400, 500]
-        elif dataset_size < 500_000:
-            return [500, 3000, 6000, 9000, 10_000]
-        else:
-            return [500, 6000, 12_000, 18_000, 20_000]
-
-    def lr_schedule(self, step):
-        supports = self.get_schedule(len(self.trainset))
-        if step < supports[0]:
-            return self.initial_lr * step / supports[0]
-        elif step >= supports[-1]:
-            return None
-        else:
-            for s in supports[1:]:
-                if s < step:
-                    self.initial_lr /= 10
-            return self.initial_lr
 
     def run(self):
         if self.test_only:
@@ -104,16 +86,18 @@ class Cifar10:
         self.train_loss = 0
         correct = 0
         total = 0
+        self.progress_bar.newbar(len(self.trainloader))
         for batch_idx, (inputs, targets) in enumerate(self.trainloader):
             with self.chrono.measure("step_time"):
                 inputs = inputs.to(self.device)
                 targets = targets.to(self.device)
 
-                self.lr = self.lr_schedule(self.epoch * 391 + batch_idx)
+                self.lr = update_lr(self.optimizer,
+                                    self.epoch, self.epochs,
+                                    self.initial_lr,
+                                    batch_idx, len(self.trainloader))
                 if self.lr is None:
                     break
-                for param_group in self.optimizer.param_groups:
-                    param_group["lr"] = self.lr
 
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
@@ -134,7 +118,7 @@ class Cifar10:
                    100. * correct / total,
                    correct,
                    total)
-            ProgressBar.update(batch_idx, len(self.trainloader), msg)
+            self.progress_bar.update(batch_idx, msg)
 
         self.chrono.remove("step_time")
         self.train_acc = 100. * correct / total
@@ -145,6 +129,7 @@ class Cifar10:
         correct = 0
         total = 0
         with torch.no_grad():
+            self.progress_bar.newbar(len(self.testloader))
             for batch_idx, (inputs, targets) in enumerate(self.testloader):
                 with self.chrono.measure("step_time"):
                     inputs = inputs.to(self.device)
@@ -165,34 +150,11 @@ class Cifar10:
                        100. * correct / total,
                        correct,
                        total)
-                ProgressBar.update(batch_idx, len(self.testloader), msg)
+                self.progress_bar.update(batch_idx, msg)
 
         self.chrono.remove("step_time")
         self.test_acc = 100. * correct / total
         self.last_test_loss = self.test_loss
-
-    def dataloader(self):
-        precrop, crop = (160, 128)
-        transform_train = torchvision.transforms.Compose([
-            torchvision.transforms.Resize((precrop, precrop)),
-            torchvision.transforms.RandomCrop((crop, crop)),
-            torchvision.transforms.RandomHorizontalFlip(),
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-        ])
-        transform_test = torchvision.transforms.Compose([
-            torchvision.transforms.Resize((crop, crop)),
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-        ])
-
-        train_dataset = torchvision.datasets.CIFAR10(root='./data', train=True, transform=transform_train)
-        test_dataset = torchvision.datasets.CIFAR10(root='./data', train=False, transform=transform_test)
-
-        train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=128, num_workers=12, shuffle=True)
-        test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=100, num_workers=12, shuffle=False)
-
-        return train_dataset, test_dataset, train_dataloader, test_dataloader
 
     def load(self):
         print('==> Loading from save...')
@@ -231,9 +193,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Training')
     parser.add_argument('-r', '--resume', action='store_true', help='resume from save')
     parser.add_argument('-t', '--test_only', action='store_true', help='Test only')
-    parser.add_argument('-l', '--learning_rate', default=1e-3, type=float, help='learning rate')
+    parser.add_argument('-l', '--learning_rate', default=3e-3, type=float, help='learning rate')
     parser.add_argument('-e', '--epoch', default=200, help='Epoch count to run in total')
     parser.add_argument('-x', '--experiment', default=1, help='Experiment number')
     parser.add_argument('-lp', '--log_path', default='logs', help='Path that log files stored')
     parser.add_argument('-m', '--model', required=True, choices=list(Cifar10.models), help='Model to run')
-Cifar10(parser.parse_args()).run()
+    Cifar10(parser.parse_args()).run()

@@ -4,6 +4,12 @@ import os.path as path
 import sys
 import time
 
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+import torch.autograd as autograd
+import torchvision
+
 
 class Utils:
 
@@ -43,20 +49,21 @@ class Utils:
 
 class ProgressBar:
     TOTAL_BAR_LENGTH = 65.
+    total = 0
 
     def __init__(self):
         _, term_width = os.popen('stty size', 'r').read().split()
         self.term_width = int(term_width)
 
-    def update(self, current, total, msg=''):
+    def update(self, current, msg=''):
         current = current + 1
-        cur_len = int(self.TOTAL_BAR_LENGTH * current / total)
+        cur_len = int(self.TOTAL_BAR_LENGTH * current / self.total)
         rest_len = int(self.TOTAL_BAR_LENGTH - cur_len) - 1
 
         sys.stdout.write(' [')
         for i in range(cur_len):
             sys.stdout.write('=')
-        sys.stdout.write('>' if current < total else '')
+        sys.stdout.write('>' if current < self.total else '')
         for i in range(rest_len):
             sys.stdout.write('.')
         sys.stdout.write('] ')
@@ -66,17 +73,18 @@ class ProgressBar:
         for i in range(self.term_width - int(self.TOTAL_BAR_LENGTH) - len(msg) - 3):
             sys.stdout.write(' ')
 
-        for i in range(self.term_width - int(self.TOTAL_BAR_LENGTH / 2) + len(str(total))):
+        for i in range(self.term_width - int(self.TOTAL_BAR_LENGTH / 2) + len(str(self.total))):
             sys.stdout.write('\b')
-        sys.stdout.write(' %d/%d ' % (current, total))
+        sys.stdout.write(' %d/%d ' % (current, self.total))
 
-        if current == total:
+        if current == self.total:
             sys.stdout.write('\n')
         sys.stdout.write('\r')
         sys.stdout.flush()
 
     def newbar(self, total, msg=''):
-        self.update(-1, total, msg)
+        self.total = total
+        self.update(-1, msg)
 
 
 class Chrono:
@@ -135,3 +143,61 @@ class Logger:
 
     def flush(self):
         self.file.flush()
+
+
+def dataloader():
+    temp_transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
+
+    temp_set = torchvision.datasets.CIFAR10(root='./data/', train=True, transform=temp_transform)
+    mean = temp_set.data.mean(axis=(0, 1, 2)) / 255
+    std = temp_set.data.std(axis=(0, 1, 2)) / 255
+
+    transform_train = torchvision.transforms.Compose([
+        torchvision.transforms.Resize((160, 160)),
+        torchvision.transforms.RandomCrop((128, 128)),
+        torchvision.transforms.RandomHorizontalFlip(),
+        torchvision.transforms.ToTensor(),
+        torchvision.transforms.Normalize(mean, std),
+    ])
+    transform_test = torchvision.transforms.Compose([
+        torchvision.transforms.Resize((160, 160)),
+        torchvision.transforms.RandomCrop((128, 128)),
+        torchvision.transforms.ToTensor(),
+        torchvision.transforms.Normalize(mean, std),
+    ])
+
+    train_dataset = torchvision.datasets.CIFAR10(root='./data', train=True, transform=transform_train)
+    test_dataset = torchvision.datasets.CIFAR10(root='./data', train=False, transform=transform_test)
+
+    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=128, num_workers=12, shuffle=True)
+    test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=16, num_workers=12, shuffle=False)
+
+    return train_dataset, test_dataset, train_dataloader, test_dataloader
+
+
+def update_lr(optimizer, epoch, epochs, lr, step, total_step):
+    if epoch < epochs[0]:
+        lr = lr * (step + 1 + total_step * epoch) / (total_step * epochs[0])
+    elif epoch >= epochs[-1]:
+        lr = None
+    else:
+        for s in epochs[1:]:
+            if s < epoch:
+                lr /= 10
+
+    for param_group in optimizer.param_groups:
+        param_group["lr"] = lr
+    return lr
+
+
+def get_torch_vars(x, var=True):
+    if torch.cuda.is_available():
+        x = x.cuda()
+    return autograd.Variable(x) if var else x
+
+
+def imshow(img):
+    npimg = img.cpu().numpy()
+    plt.axis('off')
+    plt.imshow(np.transpose(npimg, (1, 2, 0)))
+    plt.show()
