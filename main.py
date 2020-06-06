@@ -169,7 +169,7 @@ class Cifar10:
         state_dict = torch.load('./state_dicts/%s_%s.pth' % (self.saveFile, self.experiment), map_location='cpu')
         self.model.load_state_dict(state_dict['model'])
         self.optimizer.load_state_dict(state_dict['optimizer'])
-        self.epoch = state_dict['epoch']
+        self.epoch = state_dict['epoch'] + 1
         self.best_acc = state_dict['acc']
         if not self.test_only:
             print('%s epoch(s) will run, save already has %s epoch(s) and best %s accuracy'
