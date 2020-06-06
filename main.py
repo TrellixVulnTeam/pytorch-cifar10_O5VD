@@ -12,7 +12,7 @@ log_msg = '{}, {:.2f}, {:.10f}, {:.6f}, {:.4f}, {:.6f}, {:.4f}\n'
 
 
 class Cifar10:
-    epochs = [1, 5, 10, 20, 30, 40]
+    epochs = [1, 5, 10, 15, 20]
     classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     models = ('bit', 'resnet')
     epoch = 0
@@ -30,7 +30,8 @@ class Cifar10:
         self.lr = args.learning_rate
         self.test_only = args.test_only
         self.max_epoch = args.epoch
-        self.saveFile = '%s_%s' % (args.model, args.experiment)
+        self.saveFile = '%s' % args.model
+        self.experiment = '%s' % args.experiment
 
         self.progress_bar = ProgressBar()
         self.chrono = Chrono()
@@ -165,7 +166,7 @@ class Cifar10:
     def load(self):
         print('==> Loading from save...')
         assert os.path.isdir('./state_dicts'), 'Error: no state_dicts directory found!'
-        state_dict = torch.load('./state_dicts/%s.pth' % self.saveFile, map_location='cpu')
+        state_dict = torch.load('./state_dicts/%s_%s.pth' % (self.saveFile, self.experiment), map_location='cpu')
         self.model.load_state_dict(state_dict['model'])
         self.optimizer.load_state_dict(state_dict['optimizer'])
         self.epoch = state_dict['epoch']
@@ -178,6 +179,7 @@ class Cifar10:
         self.ae.load_state_dict(torch.load('./state_dicts/autoencoder.pkl', map_location='cpu'))
 
     def save(self):
+        self.best_acc = self.test_acc
         print('Saving..')
         state = {
             'model': self.model.state_dict(),
@@ -187,8 +189,7 @@ class Cifar10:
         }
         if not os.path.isdir('state_dicts'):
             os.mkdir('state_dicts')
-        torch.save(state, './state_dicts/%s.pth' % self.saveFile)
-        self.best_acc = self.test_acc
+        torch.save(state, './state_dicts/%s_%s.pth' % (self.saveFile, self.experiment))
 
     def log(self):
         self.logger.write(log_msg.format(self.epoch + 1,
