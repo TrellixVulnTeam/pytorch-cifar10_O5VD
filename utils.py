@@ -153,15 +153,11 @@ def dataloader():
     std = temp_set.data.std(axis=(0, 1, 2)) / 255
 
     transform_train = torchvision.transforms.Compose([
-        torchvision.transforms.Resize((160, 160)),
-        torchvision.transforms.RandomCrop((128, 128)),
         torchvision.transforms.RandomHorizontalFlip(),
         torchvision.transforms.ToTensor(),
         torchvision.transforms.Normalize(mean, std),
     ])
     transform_test = torchvision.transforms.Compose([
-        torchvision.transforms.Resize((160, 160)),
-        torchvision.transforms.RandomCrop((128, 128)),
         torchvision.transforms.ToTensor(),
         torchvision.transforms.Normalize(mean, std),
     ])
