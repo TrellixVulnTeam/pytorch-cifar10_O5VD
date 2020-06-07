@@ -172,17 +172,17 @@ def dataloader():
 
 
 def update_lr(optimizer, epoch, epochs, lr, step, total_step):
-    if epoch < epochs[0]:
-        lr = lr * (step + 1 + total_step * epoch) / (total_step * epochs[0])
-    elif epoch >= epochs[-1]:
-        lr = None
-    else:
-        for s in epochs[1:]:
-            if s < epoch:
-                lr /= 10
-
-    for param_group in optimizer.param_groups:
-        param_group["lr"] = lr
+    # if epoch < epochs[0]:
+    #     lr = lr * (step + 1 + total_step * epoch) / (total_step * epochs[0])
+    # elif epoch >= epochs[-1]:
+    #     lr = None
+    # else:
+    #     for s in epochs[1:]:
+    #         if s < epoch:
+    #             lr /= 10
+    #
+    # for param_group in optimizer.param_groups:
+    #     param_group["lr"] = lr
     return lr
 
 
