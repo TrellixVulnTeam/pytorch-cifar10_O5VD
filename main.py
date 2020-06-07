@@ -5,8 +5,7 @@ import numpy
 import torch
 
 import models
-from models.auto_encoder import auto_encoder as AutoEncoder
-from utils import ProgressBar, Chrono, Logger, Utils, dataloader, update_lr, get_torch_vars
+from utils import ProgressBar, Chrono, Logger, Utils, dataloader, get_torch_vars
 
 log_msg = '{}, {:.2f}, {:.10f}, {:.6f}, {:.4f}, {:.6f}, {:.4f}\n'
 
@@ -38,32 +37,29 @@ class Cifar10:
         if not os.path.isdir(args.log_path):
             os.makedirs(args.log_path)
 
-        self.logger = Logger('%s/%s-%s.csv' % (args.log_path, args.model, args.experiment))
+        self.logger = Logger('%s/%s-%s.csv' % (args.log_path, args.model, args.experiment),
+                             'epoch, time, learning_rate, tr_loss, tr_acc, val_loss, val_acc')
 
         self.trainset, self.testset, self.trainloader, self.testloader = dataloader()
 
         print('==> Building model..')
-        self.ae = AutoEncoder()
         self.model = getattr(models, args.model)()
 
         if args.model == 'bit':
             self.model.load_from(numpy.load('./state_dicts/%s.npz' % self.saveFile))
 
         if torch.cuda.is_available():
-            self.ae = torch.nn.DataParallel(self.ae)
             self.model = torch.nn.DataParallel(self.model)
             torch.backends.cudnn.benchmark = True
 
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, momentum=0.9)
 
-        self.load_ae()
         if args.resume:
             self.load()
 
         self.criterion = torch.nn.CrossEntropyLoss()
         self.criterion = get_torch_vars(self.criterion, False)
 
-        self.ae = get_torch_vars(self.ae, False)
         self.model = get_torch_vars(self.model, False)
 
     def run(self):
@@ -84,7 +80,6 @@ class Cifar10:
                     self.save()
 
     def train(self):
-        self.ae.train()
         self.model.train()
         self.train_loss = 0
         correct = 0
@@ -95,16 +90,8 @@ class Cifar10:
                 inputs = get_torch_vars(inputs)
                 targets = get_torch_vars(targets)
 
-                self.lr = update_lr(self.optimizer,
-                                    self.epoch, self.epochs,
-                                    self.initial_lr,
-                                    batch_idx, len(self.trainloader))
-                if self.lr is None:
-                    break
-
                 self.optimizer.zero_grad()
-                encoded, _ = self.ae(inputs)
-                outputs = self.model(encoded)
+                outputs = self.model(inputs)
                 loss = self.criterion(outputs, targets)
                 loss.backward()
                 self.optimizer.step()
@@ -128,7 +115,6 @@ class Cifar10:
         self.train_acc = 100. * correct / total
 
     def test(self):
-        self.ae.eval()
         self.model.eval()
         self.test_loss = 0
         correct = 0
@@ -139,8 +125,7 @@ class Cifar10:
                 with self.chrono.measure("step_time"):
                     inputs = get_torch_vars(inputs)
                     targets = get_torch_vars(targets)
-                    encoded, _ = self.ae(inputs)
-                    outputs = self.model(encoded)
+                    outputs = self.model(inputs)
                     loss = self.criterion(outputs, targets)
 
                     self.test_loss += loss.item()
@@ -173,9 +158,6 @@ class Cifar10:
         if not self.test_only:
             print('%s epoch(s) will run, save already has %s epoch(s) and best %s accuracy'
                   % ((self.epochs[-1] - self.epoch), self.epoch, self.best_acc))
-
-    def load_ae(self):
-        self.ae.load_state_dict(torch.load('./state_dicts/autoencoder.pkl', map_location='cpu'))
 
     def save(self):
         self.best_acc = self.test_acc

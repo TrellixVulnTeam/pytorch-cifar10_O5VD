@@ -126,15 +126,16 @@ class Timer:
 
 
 class Logger:
-    def __init__(self, file):
+    def __init__(self, file, header=None):
         if path.exists(file):
             self.file = open(file, 'a')
         else:
             self.file = open(file, 'w')
-            self.header()
+            if header is not None:
+                self.header(header)
 
-    def header(self):
-        self.file.write('epoch, time, learning_rate, tr_loss, tr_acc, val_loss, val_acc\n')
+    def header(self, header):
+        self.file.write('%s\n' % header)
         self.flush()
 
     def write(self, log):
@@ -169,21 +170,6 @@ def dataloader():
     test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=100, num_workers=4, shuffle=False)
 
     return train_dataset, test_dataset, train_dataloader, test_dataloader
-
-
-def update_lr(optimizer, epoch, epochs, lr, step, total_step):
-    # if epoch < epochs[0]:
-    #     lr = lr * (step + 1 + total_step * epoch) / (total_step * epochs[0])
-    # elif epoch >= epochs[-1]:
-    #     lr = None
-    # else:
-    #     for s in epochs[1:]:
-    #         if s < epoch:
-    #             lr /= 10
-    #
-    # for param_group in optimizer.param_groups:
-    #     param_group["lr"] = lr
-    return lr
 
 
 def get_torch_vars(x, var=True):
