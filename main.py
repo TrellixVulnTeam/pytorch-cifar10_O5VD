@@ -1,16 +1,16 @@
 import argparse
-import os
-
 import numpy
+import os
 import torch
 
 import models
 from utils import ProgressBar, Chrono, Logger, Utils, dataloader, get_torch_vars
 
-log_msg = '{}, {:.2f}, {:.10f}, {:.6f}, {:.4f}, {:.6f}, {:.4f}\n'
-
 
 class Cifar10:
+    log_msg = '{}, {:.2f}, {:.10f}, {:.6f}, {:.4f}, {:.6f}, {:.4f}\n'
+    step_msg = 'Step: %s | Tot: %s | Lr: %.5f | Loss: %.3f | Acc: %.3f%% (%d/%d)'
+
     epochs = [1, 5, 10, 15, 20]
     classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     models = ('bit', 'resnet')
@@ -22,23 +22,21 @@ class Cifar10:
 
     train_loss = 0
     test_loss = 0
-    last_test_loss = 0
 
     def __init__(self, args):
         self.initial_lr = args.learning_rate
         self.lr = args.learning_rate
         self.test_only = args.test_only
-        self.saveFile = '%s' % args.model
-        self.experiment = '%s' % args.experiment
-
-        self.progress_bar = ProgressBar()
-        self.chrono = Chrono()
+        self.saveFile = args.model
+        self.experiment = args.experiment
 
         if not os.path.isdir(args.log_path):
             os.makedirs(args.log_path)
 
         self.logger = Logger('%s/%s-%s.csv' % (args.log_path, args.model, args.experiment),
                              'epoch, time, learning_rate, tr_loss, tr_acc, val_loss, val_acc')
+        self.progress_bar = ProgressBar()
+        self.chrono = Chrono()
 
         self.trainset, self.testset, self.trainloader, self.testloader = dataloader()
 
@@ -76,8 +74,8 @@ class Cifar10:
 
                 self.log()
 
-                if self.test_acc > self.best_acc:
-                    self.save()
+        if self.test_acc > self.best_acc:
+            self.save()
 
     def train(self):
         self.model.train()
@@ -101,7 +99,7 @@ class Cifar10:
                 total += targets.size(0)
                 correct += predicted.eq(targets).sum().item()
 
-            msg = 'Step: %s | Tot: %s | Lr: %.5f | Loss: %.3f | Acc: %.3f%% (%d/%d)' % \
+            msg = self.step_msg % \
                   (Utils.format_time(self.chrono.last('step_time')),
                    Utils.format_time(self.chrono.total('step_time')),
                    self.lr,
@@ -133,7 +131,7 @@ class Cifar10:
                     total += targets.size(0)
                     correct += predicted.eq(targets).sum().item()
 
-                msg = 'Step: %s | Tot: %s | Lr: %.5f | Loss: %.3f | Acc: %.3f%% (%d/%d)' % \
+                msg = self.step_msg % \
                       (Utils.format_time(self.chrono.last('step_time')),
                        Utils.format_time(self.chrono.total('step_time')),
                        self.lr,
@@ -145,7 +143,6 @@ class Cifar10:
 
         self.chrono.remove("step_time")
         self.test_acc = 100. * correct / total
-        self.last_test_loss = self.test_loss
 
     def load(self):
         print('==> Loading from save...')
@@ -155,9 +152,8 @@ class Cifar10:
         self.optimizer.load_state_dict(state_dict['optimizer'])
         self.epoch = state_dict['epoch'] + 1
         self.best_acc = state_dict['acc']
-        if not self.test_only:
-            print('%s epoch(s) will run, save already has %s epoch(s) and best %s accuracy'
-                  % ((self.epochs[-1] - self.epoch), self.epoch, self.best_acc))
+        print('%s epoch(s) will run, save already has %s epoch(s) and best %s accuracy'
+              % ((self.epochs[-1] - self.epoch), self.epoch, self.best_acc))
 
     def save(self):
         self.best_acc = self.test_acc
@@ -173,11 +169,11 @@ class Cifar10:
         torch.save(state, './state_dicts/%s_%s.pth' % (self.saveFile, self.experiment))
 
     def log(self):
-        self.logger.write(log_msg.format(self.epoch + 1,
-                                         self.chrono.last("epoch"),
-                                         self.lr,
-                                         self.train_loss / len(self.trainloader), self.train_acc,
-                                         self.test_loss / len(self.testloader), self.test_acc))
+        self.logger.write(self.log_msg.format(self.epoch + 1,
+                                              self.chrono.last("epoch"),
+                                              self.lr,
+                                              self.train_loss / len(self.trainloader), self.train_acc,
+                                              self.test_loss / len(self.testloader), self.test_acc))
 
 
 if __name__ == '__main__':
@@ -188,4 +184,6 @@ if __name__ == '__main__':
     parser.add_argument('-x', '--experiment', default=1, help='Experiment number')
     parser.add_argument('-lp', '--log_path', default='logs', help='Path that log files stored')
     parser.add_argument('-m', '--model', required=True, choices=list(Cifar10.models), help='Model to run')
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
     Cifar10(parser.parse_args()).run()

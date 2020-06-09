@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 
 class StateDicts:
-    url = "https://cloud.riscue.xyz/s/zn7ipk4gR2AAoCa/download"
+    url = "https://cloud.riscue.xyz/s/zn7ipk4gR2AAoCa/download"  # TODO: Broken save file url
 
     def run(self, args):
         if args.backup:
@@ -66,7 +66,6 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--download', action='store_true', help='Download state_dicts.tar.gz')
     parser.add_argument('-e', '--extract', action='store_true', help='Extract all files from state_dicts.tar.gz')
     parser.add_argument('-r', '--remove', action='store_true', help='Remove state_dicts.tar.gz')
-    args = parser.parse_args()
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
-    StateDicts().run(args)
+    StateDicts().run(parser.parse_args())
