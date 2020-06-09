@@ -14,7 +14,7 @@ class Cifar10:
     step_msg = 'Step: %s | Tot: %s | Lr: %.5f | Loss: %.3f | Acc: %.3f%% (%d/%d)'
 
     epochs = [1, 5, 10, 15, 20]
-    classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    classes = ('airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     models = ('bit', 'resnet')
     epoch = 0
 
@@ -129,7 +129,7 @@ class Cifar10:
         self.test_loss = 0
         correct = 0
         total = 0
-        self.confusion_matrix = torch.zeros([2, 2], dtype=torch.int)
+        self.confusion_matrix = torch.zeros([len(self.classes), len(self.classes)], dtype=torch.int)
         with torch.no_grad():
             self.progress_bar.newbar(len(self.testloader))
             for batch_idx, (inputs, targets) in enumerate(self.testloader):
