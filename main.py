@@ -6,7 +6,7 @@ import numpy
 import torch
 
 import models
-from utils import ProgressBar, Chrono, Logger, Utils, dataloader, get_torch_vars
+from utils import ProgressBar, Chrono, Logger, Utils, dataloader, get_torch_vars, update_lr
 
 
 class Cifar10:
@@ -24,6 +24,8 @@ class Cifar10:
 
     train_loss = 0
     test_loss = 0
+
+    confusion_matrix = None
 
     def __init__(self, args):
         self.initial_lr = args.learning_rate
@@ -127,6 +129,7 @@ class Cifar10:
         self.test_loss = 0
         correct = 0
         total = 0
+        self.confusion_matrix = torch.zeros([2, 2], dtype=torch.int)
         with torch.no_grad():
             self.progress_bar.newbar(len(self.testloader))
             for batch_idx, (inputs, targets) in enumerate(self.testloader):
@@ -141,6 +144,9 @@ class Cifar10:
                     _, predicted = outputs.max(1)
                     total += targets.size(0)
                     correct += predicted.eq(targets).sum().item()
+
+                    for t, p in zip(targets.view(-1), predicted.view(-1)):
+                        self.confusion_matrix[t.long(), p.long()] += 1
 
                 msg = self.step_msg % (Utils.format_time(self.chrono.last('step_time')),
                                        Utils.format_time(self.chrono.total('step_time')),
@@ -177,6 +183,9 @@ class Cifar10:
         if not os.path.isdir('./%s' % self.save_path):
             os.mkdir('./%s' % self.save_path)
         torch.save(state, './%s/%s_%s.pth' % (self.save_path, self.modelName, self.experiment))
+
+        with open('./%s/%s_%s.cmx' % (self.save_path, self.modelName, self.experiment), 'w') as f:
+            print(self.confusion_matrix.cpu().data.numpy(), file=f)
 
     def log(self):
         self.logger.write(self.log_msg.format(self.epoch + 1,
