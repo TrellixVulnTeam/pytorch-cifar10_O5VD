@@ -1,6 +1,8 @@
 import argparse
-import numpy
 import os
+import sys
+
+import numpy
 import torch
 
 import models
@@ -99,14 +101,13 @@ class Cifar10:
                 total += targets.size(0)
                 correct += predicted.eq(targets).sum().item()
 
-            msg = self.step_msg % \
-                  (Utils.format_time(self.chrono.last('step_time')),
-                   Utils.format_time(self.chrono.total('step_time')),
-                   self.lr,
-                   self.train_loss / (batch_idx + 1),
-                   100. * correct / total,
-                   correct,
-                   total)
+            msg = self.step_msg % (Utils.format_time(self.chrono.last('step_time')),
+                                   Utils.format_time(self.chrono.total('step_time')),
+                                   self.lr,
+                                   self.train_loss / (batch_idx + 1),
+                                   100. * correct / total,
+                                   correct,
+                                   total)
             self.progress_bar.update(batch_idx, msg)
 
         self.chrono.remove("step_time")
@@ -131,14 +132,13 @@ class Cifar10:
                     total += targets.size(0)
                     correct += predicted.eq(targets).sum().item()
 
-                msg = self.step_msg % \
-                      (Utils.format_time(self.chrono.last('step_time')),
-                       Utils.format_time(self.chrono.total('step_time')),
-                       self.lr,
-                       self.test_loss / (batch_idx + 1),
-                       100. * correct / total,
-                       correct,
-                       total)
+                msg = self.step_msg % (Utils.format_time(self.chrono.last('step_time')),
+                                       Utils.format_time(self.chrono.total('step_time')),
+                                       self.lr,
+                                       self.test_loss / (batch_idx + 1),
+                                       100. * correct / total,
+                                       correct,
+                                       total)
                 self.progress_bar.update(batch_idx, msg)
 
         self.chrono.remove("step_time")
