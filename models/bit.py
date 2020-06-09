@@ -15,10 +15,11 @@
 # Lint as: python3
 """Bottleneck ResNet v2 with GroupNorm and Weight Standardization."""
 
+from collections import OrderedDict  # pylint: disable=g-importing-member
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from collections import OrderedDict  # pylint: disable=g-importing-member
 
 
 class StdConv2d(nn.Conv2d):

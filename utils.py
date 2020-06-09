@@ -70,7 +70,7 @@ class ProgressBar:
 
         sys.stdout.write(msg)
 
-        for i in range(self.term_width - int(self.TOTAL_BAR_LENGTH) - len(msg) - 3):
+        for i in range(self.term_width - int(self.TOTAL_BAR_LENGTH) - len(msg) - 4):
             sys.stdout.write(' ')
 
         for i in range(self.term_width - int(self.TOTAL_BAR_LENGTH / 2) + len(str(self.total))):

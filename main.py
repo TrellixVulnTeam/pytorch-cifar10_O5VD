@@ -29,13 +29,14 @@ class Cifar10:
         self.initial_lr = args.learning_rate
         self.lr = args.learning_rate
         self.test_only = args.test_only
-        self.saveFile = args.model
+        self.modelName = args.model
         self.experiment = args.experiment
+        self.save_path = args.save_path
 
         if not os.path.isdir(args.log_path):
             os.makedirs(args.log_path)
 
-        self.logger = Logger('%s/%s-%s.csv' % (args.log_path, args.model, args.experiment),
+        self.logger = Logger('%s/%s_%s.csv' % (args.log_path, self.modelName, args.experiment),
                              'epoch, time, learning_rate, tr_loss, tr_acc, val_loss, val_acc')
         self.progress_bar = ProgressBar()
         self.chrono = Chrono()
@@ -43,10 +44,10 @@ class Cifar10:
         self.trainset, self.testset, self.trainloader, self.testloader = dataloader()
 
         print('==> Building model..')
-        self.model = getattr(models, args.model)()
+        self.model = getattr(models, self.modelName)()
 
-        if args.model == 'bit':
-            self.model.load_from(numpy.load('./state_dicts/%s.npz' % self.saveFile))
+        if self.modelName == 'bit':
+            self.model.load_from(numpy.load('./state_dicts/%s.npz' % self.modelName))
 
         if torch.cuda.is_available():
             self.model = torch.nn.DataParallel(self.model)
@@ -124,6 +125,7 @@ class Cifar10:
                 with self.chrono.measure("step_time"):
                     inputs = get_torch_vars(inputs)
                     targets = get_torch_vars(targets)
+
                     outputs = self.model(inputs)
                     loss = self.criterion(outputs, targets)
 
@@ -146,8 +148,8 @@ class Cifar10:
 
     def load(self):
         print('==> Loading from save...')
-        assert os.path.isdir('./state_dicts'), 'Error: no state_dicts directory found!'
-        state_dict = torch.load('./state_dicts/%s_%s.pth' % (self.saveFile, self.experiment), map_location='cpu')
+        assert os.path.isdir('./%s' % self.save_path), 'Error: save directory not found!'
+        state_dict = torch.load('./%s/%s_%s.pth' % (self.save_path, self.modelName, self.experiment))
         self.model.load_state_dict(state_dict['model'])
         self.optimizer.load_state_dict(state_dict['optimizer'])
         self.epoch = state_dict['epoch'] + 1
@@ -164,9 +166,9 @@ class Cifar10:
             'acc': self.best_acc,
             'epoch': self.epoch
         }
-        if not os.path.isdir('state_dicts'):
-            os.mkdir('state_dicts')
-        torch.save(state, './state_dicts/%s_%s.pth' % (self.saveFile, self.experiment))
+        if not os.path.isdir('./%s' % self.save_path):
+            os.mkdir('./%s' % self.save_path)
+        torch.save(state, './%s/%s_%s.pth' % (self.save_path, self.modelName, self.experiment))
 
     def log(self):
         self.logger.write(self.log_msg.format(self.epoch + 1,
@@ -184,6 +186,7 @@ if __name__ == '__main__':
     parser.add_argument('-x', '--experiment', default=1, help='Experiment number')
     parser.add_argument('-lp', '--log_path', default='logs', help='Path that log files stored')
     parser.add_argument('-m', '--model', required=True, choices=list(Cifar10.models), help='Model to run')
+    parser.add_argument('-sp', '--save_path', default='state_dicts', help='Path that pytorch save files stored')
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
     Cifar10(parser.parse_args()).run()
