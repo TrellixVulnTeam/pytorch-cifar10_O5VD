@@ -31,12 +31,13 @@ class Cifar10:
         self.test_only = args.test_only
         self.modelName = args.model
         self.experiment = args.experiment
+        self.log_path = args.log_path
         self.save_path = args.save_path
 
-        if not os.path.isdir(args.log_path):
-            os.makedirs(args.log_path)
+        if not os.path.isdir(self.log_path):
+            os.makedirs(self.log_path)
 
-        self.logger = Logger('%s/%s_%s.csv' % (args.log_path, self.modelName, args.experiment),
+        self.logger = Logger('%s/%s_%s.csv' % (self.log_path, self.modelName, args.experiment),
                              'epoch, time, learning_rate, tr_loss, tr_acc, val_loss, val_acc')
         self.progress_bar = ProgressBar()
         self.chrono = Chrono()
@@ -88,8 +89,15 @@ class Cifar10:
         self.progress_bar.newbar(len(self.trainloader))
         for batch_idx, (inputs, targets) in enumerate(self.trainloader):
             with self.chrono.measure("step_time"):
-                inputs = get_torch_vars(inputs)
-                targets = get_torch_vars(targets)
+                inputs = get_torch_vars(inputs, requires_grad=False)
+                targets = get_torch_vars(targets, requires_grad=False)
+
+                self.lr = update_lr(self.optimizer,
+                                    self.epoch, self.epochs,
+                                    self.initial_lr,
+                                    batch_idx, len(self.trainloader))
+                if self.lr is None:
+                    break
 
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
@@ -123,8 +131,8 @@ class Cifar10:
             self.progress_bar.newbar(len(self.testloader))
             for batch_idx, (inputs, targets) in enumerate(self.testloader):
                 with self.chrono.measure("step_time"):
-                    inputs = get_torch_vars(inputs)
-                    targets = get_torch_vars(targets)
+                    inputs = get_torch_vars(inputs, requires_grad=False)
+                    targets = get_torch_vars(targets, requires_grad=False)
 
                     outputs = self.model(inputs)
                     loss = self.criterion(outputs, targets)
@@ -184,8 +192,8 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--test_only', action='store_true', help='Test only')
     parser.add_argument('-l', '--learning_rate', default=1e-2, type=float, help='learning rate')
     parser.add_argument('-x', '--experiment', default=1, help='Experiment number')
-    parser.add_argument('-lp', '--log_path', default='logs', help='Path that log files stored')
     parser.add_argument('-m', '--model', required=True, choices=list(Cifar10.models), help='Model to run')
+    parser.add_argument('-lp', '--log_path', default='logs', help='Path that log files stored')
     parser.add_argument('-sp', '--save_path', default='state_dicts', help='Path that pytorch save files stored')
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
