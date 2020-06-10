@@ -6,6 +6,7 @@ import numpy
 import torch
 
 import models
+from models.auto_encoder import auto_encoder as AutoEncoder
 from utils import ProgressBar, Chrono, Logger, Utils, dataloader, get_torch_vars, update_lr
 
 
@@ -47,23 +48,27 @@ class Cifar10:
         self.trainset, self.testset, self.trainloader, self.testloader = dataloader()
 
         print('==> Building model..')
+        self.ae = AutoEncoder()
         self.model = getattr(models, self.modelName)()
 
         if self.modelName == 'bit':
             self.model.load_from(numpy.load('./state_dicts/%s.npz' % self.modelName))
 
         if torch.cuda.is_available():
+            self.ae = torch.nn.DataParallel(self.ae)
             self.model = torch.nn.DataParallel(self.model)
             torch.backends.cudnn.benchmark = True
 
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, momentum=0.9)
 
+        self.load_ae()
         if args.resume:
             self.load()
 
         self.criterion = torch.nn.CrossEntropyLoss()
         self.criterion = get_torch_vars(self.criterion, False)
 
+        self.ae = get_torch_vars(self.ae, False)
         self.model = get_torch_vars(self.model, False)
 
     def run(self):
@@ -84,6 +89,7 @@ class Cifar10:
                     self.save()
 
     def train(self):
+        self.ae.train()
         self.model.train()
         self.train_loss = 0
         correct = 0
@@ -102,7 +108,8 @@ class Cifar10:
                     break
 
                 self.optimizer.zero_grad()
-                outputs = self.model(inputs)
+                encoded, _ = self.ae(inputs)
+                outputs = self.model(encoded)
                 loss = self.criterion(outputs, targets)
                 loss.backward()
                 self.optimizer.step()
@@ -125,6 +132,7 @@ class Cifar10:
         self.train_acc = 100. * correct / total
 
     def test(self):
+        self.ae.eval()
         self.model.eval()
         self.test_loss = 0
         correct = 0
@@ -137,7 +145,8 @@ class Cifar10:
                     inputs = get_torch_vars(inputs, requires_grad=False)
                     targets = get_torch_vars(targets, requires_grad=False)
 
-                    outputs = self.model(inputs)
+                    encoded, _ = self.ae(inputs)
+                    outputs = self.model(encoded)
                     loss = self.criterion(outputs, targets)
 
                     self.test_loss += loss.item()
@@ -171,6 +180,9 @@ class Cifar10:
         print('%s epoch(s) will run, save already has %s epoch(s) and best %s accuracy'
               % ((self.epochs[-1] - self.epoch), self.epoch, self.best_acc))
 
+    def load_ae(self):
+        self.ae.load_state_dict(torch.load('./state_dicts/autoencoder.pkl', map_location='cpu'))
+
     def save(self):
         self.best_acc = self.test_acc
         print('Saving..')
@@ -199,7 +211,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Training')
     parser.add_argument('-r', '--resume', action='store_true', help='resume from save')
     parser.add_argument('-t', '--test_only', action='store_true', help='Test only')
-    parser.add_argument('-l', '--learning_rate', default=1e-2, type=float, help='learning rate')
+    parser.add_argument('-l', '--learning_rate', default=3e-3, type=float, help='learning rate')
     parser.add_argument('-x', '--experiment', default=1, help='Experiment number')
     parser.add_argument('-m', '--model', required=True, choices=list(Cifar10.models), help='Model to run')
     parser.add_argument('-lp', '--log_path', default='logs', help='Path that log files stored')
