@@ -52,10 +52,26 @@ class ProgressBar:
     total = 0
 
     def __init__(self):
-        _, term_width = os.popen('stty size', 'r').read().split()
-        self.term_width = int(term_width)
+        try:
+            _, term_width = os.popen('stty size', 'r').read().split()
+            self.term_width = int(term_width)
+        except ValueError:
+            self.term_width = -1
 
     def update(self, current, msg=''):
+        if self.term_width == -1:
+            self.dump_progress(current, msg)
+        else:
+            self.update_progress(current, msg)
+
+    def dump_progress(self, current, msg=''):
+        current = current + 1
+        sys.stdout.write(' %d/%d ' % (current, self.total))
+        sys.stdout.write(msg)
+        sys.stdout.write('\n')
+        sys.stdout.flush()
+
+    def update_progress(self, current, msg=''):
         current = current + 1
         cur_len = int(self.TOTAL_BAR_LENGTH * current / self.total)
         rest_len = int(self.TOTAL_BAR_LENGTH - cur_len) - 1
