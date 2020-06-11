@@ -89,7 +89,7 @@ class Cifar10:
                     self.save()
 
     def train(self):
-        self.ae.train()
+        self.ae.eval()
         self.model.train()
         self.train_loss = 0
         correct = 0
