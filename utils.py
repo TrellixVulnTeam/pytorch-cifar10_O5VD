@@ -182,7 +182,7 @@ def dataloader():
     train_dataset = torchvision.datasets.CIFAR10(root='./data', train=True, transform=transform_train)
     test_dataset = torchvision.datasets.CIFAR10(root='./data', train=False, transform=transform_test)
 
-    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=128, num_workers=12, shuffle=True)
+    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=128, num_workers=12, shuffle=False)
     test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=100, num_workers=12, shuffle=False)
 
     return train_dataset, test_dataset, train_dataloader, test_dataloader
@@ -203,10 +203,10 @@ def update_lr(optimizer, epoch, epochs, lr, step, total_step):
     return lr
 
 
-def get_torch_vars(x, var=True, requires_grad=True):
+def get_torch_vars(x, var=True):
     if torch.cuda.is_available():
         x = x.cuda()
-    return autograd.Variable(x, requires_grad) if var else x
+    return autograd.Variable(x) if var else x
 
 
 def imshow(img):
