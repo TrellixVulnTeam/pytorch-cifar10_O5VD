@@ -32,6 +32,7 @@ class Cifar10:
         self.initial_lr = args.learning_rate
         self.lr = args.learning_rate
         self.test_only = args.test_only
+        self.dump_statistics = args.dump_statistics
         self.modelName = args.model
         self.experiment = args.experiment
         self.log_path = args.log_path
@@ -74,6 +75,9 @@ class Cifar10:
     def run(self):
         if self.test_only:
             self.test()
+        elif self.dump_statistics:
+            self.test()
+            self.save()
         else:
             for epoch in range(self.epoch, self.epochs[-1]):
                 self.epoch = epoch
@@ -211,6 +215,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Training')
     parser.add_argument('-r', '--resume', action='store_true', help='resume from save')
     parser.add_argument('-t', '--test_only', action='store_true', help='Test only')
+    parser.add_argument('-s', '--dump_statistics', action='store_true', help='Test and save all statistics')
     parser.add_argument('-l', '--learning_rate', default=3e-3, type=float, help='learning rate')
     parser.add_argument('-x', '--experiment', default=1, help='Experiment number')
     parser.add_argument('-m', '--model', required=True, choices=list(Cifar10.models), help='Model to run')
