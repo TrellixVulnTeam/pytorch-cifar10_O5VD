@@ -6,8 +6,7 @@ import numpy
 import torch
 
 import models
-from models.auto_encoder import auto_encoder as AutoEncoder
-from utils import ProgressBar, Chrono, Logger, Utils, dataloader, get_torch_vars, update_lr
+from utils import ProgressBar, Chrono, Logger, Utils, dataloader, get_torch_vars
 
 
 class Cifar10:
@@ -60,7 +59,7 @@ class Cifar10:
 
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, momentum=0.9)
 
-        if args.resume:
+        if args.resume or self.test_only or self.dump_statistics:
             self.load()
 
         self.criterion = torch.nn.CrossEntropyLoss()
@@ -73,7 +72,8 @@ class Cifar10:
             self.test()
         elif self.dump_statistics:
             self.test()
-            self.save()
+            self.dump_cmx()
+            self.dump_measurements()
         else:
             for epoch in range(self.epoch, self.epochs[-1]):
                 self.epoch = epoch
@@ -182,6 +182,10 @@ class Cifar10:
             os.mkdir('./%s' % self.save_path)
         torch.save(state, './%s/%s_%s.pth' % (self.save_path, self.modelName, self.experiment))
 
+        self.dump_cmx()
+        self.dump_measurements()
+
+    def dump_cmx(self):
         with open('./%s/%s_%s.cmx' % (self.save_path, self.modelName, self.experiment), 'w') as f:
             print(self.confusion_matrix.cpu().data.numpy(), file=f)
 
@@ -191,6 +195,19 @@ class Cifar10:
                                               self.lr,
                                               self.train_loss / len(self.trainloader), self.train_acc,
                                               self.test_loss / len(self.testloader), self.test_acc))
+
+    def dump_measurements(self):
+        with open('./%s/%s_%s.mea' % (self.save_path, self.modelName, self.experiment), 'w') as f:
+            tp = self.confusion_matrix.diag()
+            for c in range(len(self.classes)):
+                idx = torch.ones(len(self.classes)).byte()
+                idx[c] = 0
+
+                tn = self.confusion_matrix[idx.nonzero()[:, None], idx.nonzero()].sum()
+                fp = self.confusion_matrix[idx, c].sum()
+                fn = self.confusion_matrix[c, idx].sum()
+
+                print('Class {}\nTP {}, TN {}, FP {}, FN {}'.format(c, tp[c], tn, fp, fn), file=f)
 
 
 if __name__ == '__main__':
