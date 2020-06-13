@@ -1,14 +1,14 @@
 import argparse
 import os
 import sys
-import tarfile
 
 import requests
-import tqdm
+import tarfile
+from tqdm import tqdm
 
 
 class StateDicts:
-    url = "https://cloud.riscue.xyz/s/zn7ipk4gR2AAoCa/download"  # TODO: Broken save file url
+    url = "https://cloud.riscue.xyz/s/7ZDb7k3t5btDecm/download"
 
     def run(self, args):
         if args.backup:
